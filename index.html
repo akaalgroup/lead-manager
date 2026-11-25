@@ -189,7 +189,7 @@ body:not(.authed) .app{display:none}
         <div id="cb"></div><div id="list"></div>
         <p id="legend">Client rating = tickets issued ÷ calls: 80%+ green · 60%+ orange · 40%+ yellow · 20%+ blue · below 20% red (grey = fewer than 3 calls)</p>
       </section>
-      <section id="v-team" hidden><div class="pthead"><div><h1>Team</h1><div class="sub">Approve staff and set roles</div></div></div><div id="teamb"></div><p class="sub" style="margin-top:16px">To add a person: Supabase dashboard &rarr; Authentication &rarr; Users &rarr; Add user. Then come here, tick <b>Active</b>, set their name and role, and press Save.</p></section>
+      <section id="v-team" hidden><div class="pthead"><div><h1>Team</h1><div class="sub">Approve staff and set roles</div></div></div><div class="tbl2" style="padding:16px;margin-bottom:16px"><div style="font-weight:600;margin-bottom:8px">Add a new user</div><div style="display:flex;flex-wrap:wrap;gap:8px"><input id="nu-n" placeholder="Full name" style="flex:1 1 150px;min-width:0"><input id="nu-e" type="email" placeholder="Email (used to login)" style="flex:1 1 200px;min-width:0"><input id="nu-p" type="text" placeholder="Password (min 8)" style="flex:1 1 150px;min-width:0"><select id="nu-r"><option value="staff">Staff</option><option value="admin">Admin</option></select><button class="btn pri" id="nu-b">Create user</button></div><div class="sub" id="nu-m" style="margin-top:8px">Give the email and password to the person. They can login immediately.</div></div><div id="teamb"></div></section>
       <p id="note"></p>
     </main>
   </div>
@@ -458,8 +458,16 @@ function saveFin(id){var c=+$("fc_"+id).value||0,sp=+$("fs_"+id).value||0;
   ok(sb.from("lead_finance").upsert({lead_id:id,cost_price:c,sell_price:sp})).then(function(){toast("Prices saved.");later("f",loadFin)}).catch(function(e){toast("Could not save prices: "+dbErr(e))})}
 $("vd").oninput=function(e){var t=e.target;if(t.dataset&&t.dataset.fk){var id=t.dataset.fk,c=+$("fc_"+id).value||0,sp=+$("fs_"+id).value||0;$("fp_"+id).textContent=(sp-c).toFixed(2)}};
 function teamR(){var el=$("teamb");if(!el||!isAdmin)return;
-  el.innerHTML='<div class="tbl2"><table class="tt"><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr>'+pls.map(function(p){return '<tr data-pid="'+esc(p.id)+'"><td><input class="tn" value="'+esc(p.full_name||"")+'"></td><td>'+esc(p.email||"")+'</td><td><select class="tr"><option value="staff"'+(p.role==="staff"?" selected":"")+'>Staff</option><option value="admin"'+(p.role==="admin"?" selected":"")+'>Admin</option></select></td><td><input type="checkbox" class="ta"'+(p.active?" checked":"")+'></td><td><button class="btn s" data-ts="'+esc(p.id)+'">Save</button></td></tr>'}).join("")+'</table></div>'}
-$("teamb").onclick=function(e){var b=e.target.closest("[data-ts]");if(!b)return;var r=b.closest("tr"),id=b.dataset.ts,role=r.querySelector(".tr").value,act=r.querySelector(".ta").checked,nm=r.querySelector(".tn").value.trim();
+  el.innerHTML='<div class="tbl2"><table class="tt"><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th></th><th>New password</th></tr>'+pls.map(function(p){return '<tr data-pid="'+esc(p.id)+'"><td><input class="tn" value="'+esc(p.full_name||"")+'"></td><td>'+esc(p.email||"")+'</td><td><select class="tr"><option value="staff"'+(p.role==="staff"?" selected":"")+'>Staff</option><option value="admin"'+(p.role==="admin"?" selected":"")+'>Admin</option></select></td><td><input type="checkbox" class="ta"'+(p.active?" checked":"")+'></td><td><button class="btn s" data-ts="'+esc(p.id)+'">Save</button></td><td style="white-space:nowrap"><input class="tp" placeholder="min 8" style="width:90px"> <button class="btn s" data-tp="'+esc(p.id)+'">Set</button></td></tr>'}).join("")+'</table></div>'}
+$("nu-b").onclick=function(){var n=$("nu-n").value.trim(),em=$("nu-e").value.trim(),pw=$("nu-p").value,m=$("nu-m");
+  if(!n||!em||pw.length<8){m.textContent="Enter name, email and a password of at least 8 characters.";return}
+  $("nu-b").disabled=true;m.textContent="Creating...";
+  sb.rpc("create_staff",{p_email:em,p_password:pw,p_name:n,p_role:$("nu-r").value}).then(function(x){$("nu-b").disabled=false;
+    if(x.error){m.textContent="Could not create: "+x.error.message;return}
+    m.textContent="Created. Login: "+em+" / "+pw;$("nu-n").value=$("nu-e").value=$("nu-p").value="";loadProfiles()})};
+$("teamb").onclick=function(e){var pb=e.target.closest("[data-tp]");if(pb){var pw=pb.closest("tr").querySelector(".tp").value;if(pw.length<8){toast("Password needs at least 8 characters.");return}
+  sb.rpc("set_staff_password",{p_id:pb.dataset.tp,p_password:pw}).then(function(x){toast(x.error?"Could not change: "+x.error.message:"Password changed.");if(!x.error)pb.closest("tr").querySelector(".tp").value=""});return}
+  var b=e.target.closest("[data-ts]");if(!b)return;var r=b.closest("tr"),id=b.dataset.ts,role=r.querySelector(".tr").value,act=r.querySelector(".ta").checked,nm=r.querySelector(".tn").value.trim();
   if(id===me&&(role!=="admin"||!act)){toast("You cannot remove your own admin access.");return}
   sb.from("profiles").update({full_name:nm,role:role,active:act}).eq("id",id).select().then(function(x){if(x.error||!x.data||!x.data.length)toast("Could not save. Only an admin can change this.");else{toast("Saved.");loadProfiles()}})};
 function subscribe(){if(rt)sb.removeChannel(rt);
